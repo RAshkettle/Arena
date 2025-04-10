@@ -49,6 +49,28 @@ export const createPlayer = (scene, gui) => {
 
       const model = gltf.scene;
 
+      // Modify material properties to look more like bone
+      model.traverse((node) => {
+        if (node.isMesh && node.material) {
+          // Handle both single materials and material arrays
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          
+          materials.forEach(material => {
+            // Make material more bone-like (less reflective, more matte)
+            material.roughness = 0.9;       // High roughness for matte appearance
+            material.metalness = 0.1;       // Low metalness for non-metallic look
+            material.color.set(0xf0efe7);   // Slightly off-white bone color
+            material.emissive.set(0x000000); // No emission
+            
+            // Optional: add subtle subsurface scattering effect if it's a MeshPhysicalMaterial
+            if (material.type === 'MeshPhysicalMaterial') {
+              material.transmission = 0.1;  // Slight translucency
+              material.clearcoat = 0.2;     // Subtle clearcoat for bone shine
+            }
+          });
+        }
+      });
+
       // Get the bounding box of the model to calculate proper scaling
       const boundingBox = new THREE.Box3().setFromObject(model);
       const originalHeight = boundingBox.max.y - boundingBox.min.y;
