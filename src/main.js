@@ -1,79 +1,75 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import * as lil from "lil-gui";
 
 import { getNewRenderer } from "./renderer";
+import { createCamera, updateCameraAspect } from "./camera";
+import { createControls } from "./controls";
+import { createScene, createCube } from "./scene";
+import { setupResizeHandler, setupFullscreenHandler } from "./events";
 
+// Initialize GUI
 const gui = new lil.GUI();
 
+// Get canvas
+/**
+ * @type {HTMLCanvasElement}
+ */
 const canvas = document.querySelector("canvas.webgl");
-const scene = new THREE.Scene();
 
-//create a cube
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const mesh = new THREE.Mesh(geometry, material);
-gui.add(mesh.position, "y").min(-3).max(3).step(0.01).name("elevation");
-
-scene.add(mesh);
-
+/**
+ * Window dimensions object
+ * @type {{width: number, height: number}}
+ */
 const windowSize = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
 
-const camera = new THREE.PerspectiveCamera(
-  75,
-  windowSize.width / windowSize.height,
-  0.1,
-  100,
-);
-camera.position.z = 3;
+// Setup scene and objects
+const scene = createScene();
+const mesh = createCube(scene, gui);
 
-//controls
-const controls = new OrbitControls(camera, canvas);
-controls.endbleDamping = true;
+// Setup camera
+const camera = createCamera(windowSize);
 
+// Setup controls
+const controls = createControls(camera, canvas);
+
+// Setup renderer
 const renderer = getNewRenderer(canvas, windowSize);
 
-const clock = new THREE.Clock();
+// Setup event handlers
+setupResizeHandler(windowSize, camera, renderer);
+setupFullscreenHandler(canvas);
 
-const tick = () => {
-  const elapsedTime = clock.getElapsedTime();
-
-  controls.update();
-  renderer.render(scene, camera);
-  window.requestAnimationFrame(tick);
-};
-
-window.addEventListener("resize", () => {
-  windowSize.width = window.innerWidth;
-  windowSize.height = window.innerHeight;
-});
-
-window.addEventListener("dblclick", () => {
-  const fullscreenElement =
-    document.fullscreenElement || document.webkitFullscreenElement;
-
-  if (!fullscreenElement) {
-    if (canvas.requestFullscreen) {
-      canvas.requestFullscreen();
-    } else if (canvas.webkitRequestFullscreen) {
-      canvas.webkitRequestFullscreen();
-    }
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
-  }
-});
-
-camera.aspect = windowSize.width / windowSize.height;
-camera.updateProjectionMatrix();
-
+// Initial resize
+updateCameraAspect(camera, windowSize);
 renderer.setSize(windowSize.width, windowSize.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+// Animation loop
+/**
+ * Clock for tracking elapsed time
+ * @type {THREE.Clock}
+ */
+const clock = new THREE.Clock();
+
+/**
+ * Animation loop function that renders each frame
+ * @param {number} [timestamp] - The current timestamp (automatically provided by requestAnimationFrame)
+ */
+const tick = (timestamp) => {
+  const elapsedTime = clock.getElapsedTime();
+
+  // Update controls
+  controls.update();
+
+  // Render
+  renderer.render(scene, camera);
+
+  // Call tick again on the next frame
+  window.requestAnimationFrame(tick);
+};
+
+// Start animation loop
 tick();
