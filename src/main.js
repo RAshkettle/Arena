@@ -2,14 +2,29 @@ import * as THREE from "three";
 import * as lil from "lil-gui";
 
 import { getNewRenderer } from "./renderer";
-import { createCamera, updateCameraAspect } from "./camera";
+import {
+  createCamera,
+  updateCameraAspect,
+  updateThirdPersonCamera,
+} from "./camera";
 import { createControls } from "./controls";
 import { createScene, createGround } from "./scene";
 import { createPlayer } from "./player";
 import { setupResizeHandler, setupFullscreenHandler } from "./events";
 
+/**
+ * Global debug flag to control GUI visibility
+ * @type {boolean}
+ */
+const debug = true;
+
 // Initialize GUI
 const gui = new lil.GUI();
+
+// Show or hide GUI based on debug flag
+if (!debug) {
+  gui.hide();
+}
 
 // Get canvas
 /**
@@ -42,8 +57,8 @@ scene.add(directionalLight);
 // Setup camera
 const camera = createCamera(windowSize);
 
-// Setup controls
-const controls = createControls(camera, canvas);
+// Setup controls - now simplified without the canvas parameter
+const controls = createControls();
 
 // Setup renderer
 const renderer = getNewRenderer(canvas, windowSize);
@@ -70,6 +85,9 @@ const clock = new THREE.Clock();
  */
 const tick = (timestamp) => {
   const elapsedTime = clock.getElapsedTime();
+
+  // Update third-person camera to follow the player
+  updateThirdPersonCamera(camera, playerMesh);
 
   // Update controls
   controls.update();

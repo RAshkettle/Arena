@@ -24,8 +24,8 @@ export const createPlayer = (scene, gui) => {
 
   // Add controls for the player position
   const playerFolder = gui.addFolder("Player Position");
-  playerFolder.add(player.position, "x").min(-10).max(10).step(0.1).name("X");
-  playerFolder.add(player.position, "z").min(-10).max(10).step(0.1).name("Z");
+  playerFolder.add(player.position, "x").min(-50).max(50).step(0.1).name("X");
+  playerFolder.add(player.position, "z").min(-50).max(50).step(0.1).name("Z");
 
   return player;
 };

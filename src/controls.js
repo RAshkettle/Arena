@@ -1,13 +1,13 @@
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-
 /**
- * Creates and configures orbit controls
- * @param {THREE.Camera} camera - The camera to be controlled
- * @param {HTMLElement} canvas - The DOM element to bind the controls to
- * @returns {OrbitControls} The configured orbit controls
+ * Creates a simple placeholder for controls
+ * @returns {Object} A simple controls object with an update method
  */
-export const createControls = (camera, canvas) => {
-  const controls = new OrbitControls(camera, canvas);
-  controls.enableDamping = true;
-  return controls;
+export const createControls = () => {
+  // Replace OrbitControls with a simple object that has an update method
+  // This allows us to maintain the same interface in the main code
+  return {
+    update: () => {
+      // No control updates needed here since camera follows player directly
+    },
+  };
 };
