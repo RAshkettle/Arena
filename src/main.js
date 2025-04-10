@@ -5,6 +5,7 @@ import { getNewRenderer } from "./renderer";
 import { createCamera, updateCameraAspect } from "./camera";
 import { createControls } from "./controls";
 import { createScene, createGround } from "./scene";
+import { createPlayer } from "./player";
 import { setupResizeHandler, setupFullscreenHandler } from "./events";
 
 // Initialize GUI
@@ -27,7 +28,16 @@ const windowSize = {
 
 // Setup scene and objects
 const scene = createScene();
-const mesh = createGround(scene, gui);
+const groundMesh = createGround(scene, gui);
+const playerMesh = createPlayer(scene, gui);
+
+// Add lights to the scene for the standard material
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(5, 10, 5);
+scene.add(directionalLight);
 
 // Setup camera
 const camera = createCamera(windowSize);
