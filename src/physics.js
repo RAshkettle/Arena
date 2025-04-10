@@ -6,6 +6,11 @@ let physicsObjects = [];
 let gravity = { x: 0.0, y: -9.81, z: 0.0 };
 let rapierLoaded = false;
 
+// Movement and jump settings
+const MOVE_SPEED = 2.0; // 2 units per second
+const JUMP_FORCE = 5.0; // Jump force
+const GROUND_DETECTION_DISTANCE = 0.1; // Distance to check for ground beneath player
+
 /**
  * Initializes the Rapier physics engine
  * @returns {Promise<boolean>} Promise that resolves when Rapier is initialized
@@ -77,11 +82,15 @@ export const createPlayerCollider = (playerMesh) => {
   if (!world) return null;
 
   // Create a dynamic rigid body for the player
-  const playerRigidBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(
-    playerMesh.position.x,
-    playerMesh.position.y,
-    playerMesh.position.z
-  );
+  const playerRigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(
+      playerMesh.position.x,
+      playerMesh.position.y,
+      playerMesh.position.z
+    )
+    // Lock rotation to prevent player from falling over
+    .lockRotations();
+
   const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
 
   // Create a capsule collider
@@ -106,9 +115,27 @@ export const createPlayerCollider = (playerMesh) => {
 /**
  * Updates the physics world and syncs mesh positions
  * @param {number} deltaTime - Time step for the physics update
+ * @param {Object} inputDirection - Direction input from player
+ * @param {boolean} jumpRequested - Whether the player has requested to jump
  */
-export const updatePhysics = (deltaTime) => {
+export const updatePhysics = (
+  deltaTime,
+  inputDirection = { x: 0, z: 0 },
+  jumpRequested = false
+) => {
   if (!world) return;
+
+  // Process player movement and jump if player exists
+  const playerPhysics = getPlayerPhysics();
+  if (playerPhysics) {
+    // Handle player movement
+    movePlayer(playerPhysics.body, inputDirection, deltaTime);
+
+    // Handle jumping
+    if (jumpRequested && isPlayerOnGround(playerPhysics.body)) {
+      playerJump(playerPhysics.body);
+    }
+  }
 
   // Step the physics simulation
   world.step();
@@ -124,6 +151,66 @@ export const updatePhysics = (deltaTime) => {
     }
     // Ground is static, so no need to update its position
   }
+};
+
+/**
+ * Moves the player based on input direction
+ * @param {RAPIER.RigidBody} playerBody - The player's rigid body
+ * @param {Object} direction - Input direction (normalized)
+ * @param {number} deltaTime - Time step in seconds
+ */
+const movePlayer = (playerBody, direction, deltaTime) => {
+  if (!playerBody) return;
+
+  // Calculate move distance for this frame (units/second * seconds = units)
+  const moveDistance = MOVE_SPEED * deltaTime;
+
+  // Get the current velocity
+  const velocity = playerBody.linvel();
+
+  // Apply horizontal movement while preserving vertical velocity
+  playerBody.setLinvel(
+    {
+      x: direction.x * MOVE_SPEED,
+      y: velocity.y, // Preserve vertical velocity (gravity, jump)
+      z: direction.z * MOVE_SPEED,
+    },
+    true
+  );
+};
+
+/**
+ * Makes the player jump by applying an upward impulse
+ * @param {RAPIER.RigidBody} playerBody - The player's rigid body
+ */
+const playerJump = (playerBody) => {
+  if (!playerBody) return;
+
+  // Apply an upward impulse for jumping
+  playerBody.applyImpulse({ x: 0, y: JUMP_FORCE, z: 0 }, true);
+};
+
+/**
+ * Checks if the player is on the ground by ray casting
+ * @param {RAPIER.RigidBody} playerBody - The player's rigid body
+ * @returns {boolean} - True if the player is on the ground
+ */
+const isPlayerOnGround = (playerBody) => {
+  if (!playerBody || !world) return false;
+
+  // Get player position
+  const position = playerBody.translation();
+
+  // Cast a ray straight down from the player's position
+  const rayOrigin = { x: position.x, y: position.y, z: position.z };
+  const rayDirection = { x: 0, y: -1, z: 0 }; // Straight down
+
+  // Create a ray in the world
+  const ray = new RAPIER.Ray(rayOrigin, rayDirection);
+  const hit = world.castRay(ray, GROUND_DETECTION_DISTANCE, true);
+
+  // If hit is not null and distance is small enough, player is on ground
+  return hit !== null && hit.toi <= GROUND_DETECTION_DISTANCE;
 };
 
 /**

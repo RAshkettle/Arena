@@ -19,6 +19,7 @@ import {
   setPlayerPosition,
   getPlayerPhysics,
 } from "./physics";
+import InputHandler from "./input";
 
 /**
  * Global debug flag to control GUI visibility
@@ -79,6 +80,9 @@ setupFullscreenHandler(canvas);
 updateCameraAspect(camera, windowSize);
 renderer.setSize(windowSize.width, windowSize.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+// Create input handler for player controls
+const inputHandler = new InputHandler();
 
 // Physics objects
 let playerBody = null;
@@ -159,8 +163,27 @@ const tick = (timestamp) => {
   const deltaTime = elapsedTime - previousTime;
   previousTime = elapsedTime;
 
-  // Update physics (with fixed time step)
-  updatePhysics(deltaTime);
+  // Get player input
+  const movementDirection = inputHandler.getMovementDirection();
+  const jumpPressed = inputHandler.isJumpPressed();
+
+  // Normalize movement direction if needed
+  if (movementDirection.x !== 0 && movementDirection.z !== 0) {
+    const length = Math.sqrt(
+      movementDirection.x * movementDirection.x +
+        movementDirection.z * movementDirection.z
+    );
+    movementDirection.x /= length;
+    movementDirection.z /= length;
+  }
+
+  // Update physics with player input
+  updatePhysics(deltaTime, movementDirection, jumpPressed);
+
+  // Reset jump to prevent continuous jumping while holding space
+  if (jumpPressed) {
+    inputHandler.resetJump();
+  }
 
   // Update third-person camera to follow the player
   updateThirdPersonCamera(camera, playerMesh);
