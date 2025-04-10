@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import * as lil from "lil-gui";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
+import { TextureLoader } from "three";
 
 /**
  * Creates a new Three.js scene
@@ -68,10 +69,19 @@ export const createSkybox = (scene, gui) => {
  * @returns {THREE.Mesh} The created ground plane mesh
  */
 export const createGround = (scene, gui) => {
+  // Load the cobblestone texture
+  const textureLoader = new TextureLoader();
+  const cobblestoneTexture = textureLoader.load("assets/cobblestone.jpg");
+
+  // Set texture repeat for a tiled effect
+  cobblestoneTexture.wrapS = THREE.RepeatWrapping;
+  cobblestoneTexture.wrapT = THREE.RepeatWrapping;
+  cobblestoneTexture.repeat.set(10, 10); // Adjust repeat count to control tiling
+
   // Create a 50x50 plane
   const geometry = new THREE.PlaneGeometry(50, 50);
   const material = new THREE.MeshStandardMaterial({
-    color: 0x8b4513, // Changed from 0x00ff00 (green) to 0x8B4513 (brown)
+    map: cobblestoneTexture,
     side: THREE.DoubleSide,
     roughness: 0.8,
     metalness: 0.2,
@@ -81,7 +91,13 @@ export const createGround = (scene, gui) => {
   // Rotate plane to be horizontal (facing up)
   mesh.rotation.x = -Math.PI / 2;
 
+  // Add GUI controls for elevation and texture tiling
   gui.add(mesh.position, "y").min(-3).max(3).step(0.01).name("elevation");
+
+  const textureFolder = gui.addFolder("Cobblestone Texture");
+  textureFolder.add(cobblestoneTexture.repeat, "x", 1, 20, 1).name("Repeat X");
+  textureFolder.add(cobblestoneTexture.repeat, "y", 1, 20, 1).name("Repeat Y");
+
   scene.add(mesh);
 
   return mesh;

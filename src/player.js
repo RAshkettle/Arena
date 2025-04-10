@@ -275,6 +275,23 @@ export const loadPlayer = async (scene) => {
           }
         }
 
+        // Adjust material properties to look like bone
+        model.traverse((child) => {
+          if (child.isMesh && child.material) {
+            // Handle both single materials and material arrays
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            
+            materials.forEach(material => {
+              if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+                material.metalness = 0.1;  // Lower metallic to 0.1 as requested
+                material.roughness = 0.8;  // Increase roughness for a more bone-like appearance
+                material.needsUpdate = true;
+                console.log("Updated material properties for bone-like appearance");
+              }
+            });
+          }
+        });
+
         // Calculate bounding box for proper positioning
         const boundingBox = new THREE.Box3().setFromObject(model);
         const scaledBoundingBox = boundingBox.clone();
