@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as lil from "lil-gui";
+
 import { getNewRenderer } from "./renderer";
+
+const gui = new lil.GUI();
 
 const canvas = document.querySelector("canvas.webgl");
 const scene = new THREE.Scene();
@@ -9,6 +13,7 @@ const scene = new THREE.Scene();
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 const mesh = new THREE.Mesh(geometry, material);
+gui.add(mesh.position, "y").min(-3).max(3).step(0.01).name("elevation");
 
 scene.add(mesh);
 
