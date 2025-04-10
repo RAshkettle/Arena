@@ -11,6 +11,14 @@ import { createControls } from "./controls";
 import { createScene, createGround } from "./scene";
 import { createPlayer } from "./player";
 import { setupResizeHandler, setupFullscreenHandler } from "./events";
+import {
+  initPhysics,
+  createGroundCollider,
+  createPlayerCollider,
+  updatePhysics,
+  setPlayerPosition,
+  getPlayerPhysics,
+} from "./physics";
 
 /**
  * Global debug flag to control GUI visibility
@@ -72,12 +80,75 @@ updateCameraAspect(camera, windowSize);
 renderer.setSize(windowSize.width, windowSize.height);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+// Physics objects
+let playerBody = null;
+let groundCollider = null;
+
+// Initialize physics and set up the scene once ready
+initPhysics().then(() => {
+  // Create physics colliders
+  groundCollider = createGroundCollider(groundMesh);
+  playerBody = createPlayerCollider(playerMesh);
+
+  if (debug) {
+    // Add physics controls to GUI
+    const physicsFolder = gui.addFolder("Physics");
+    const physicsParams = {
+      resetPlayer: () => {
+        setPlayerPosition(playerBody, 0, 5, 0);
+      },
+    };
+
+    physicsFolder
+      .add(physicsParams, "resetPlayer")
+      .name("Reset Player Position");
+  }
+});
+
+// Connect GUI controls to physics
+if (debug) {
+  // Override player position controls to update physics
+  const playerFolder = gui.folders.find((f) => f.title === "Player Position");
+  if (playerFolder) {
+    // Store original onChange handlers
+    const controllers = playerFolder.controllers;
+
+    controllers.forEach((controller) => {
+      const property = controller.property;
+      if (property === "x" || property === "z") {
+        const originalOnChange = controller.onChange;
+        controller.onChange((value) => {
+          // Call original handler if it exists
+          if (originalOnChange) {
+            originalOnChange(value);
+          }
+
+          // Update physics body
+          if (playerBody) {
+            const physics = getPlayerPhysics();
+            if (physics && physics.body) {
+              const pos = physics.body.translation();
+              setPlayerPosition(
+                physics.body,
+                property === "x" ? value : pos.x,
+                pos.y,
+                property === "z" ? value : pos.z
+              );
+            }
+          }
+        });
+      }
+    });
+  }
+}
+
 // Animation loop
 /**
  * Clock for tracking elapsed time
  * @type {THREE.Clock}
  */
 const clock = new THREE.Clock();
+let previousTime = 0;
 
 /**
  * Animation loop function that renders each frame
@@ -85,6 +156,11 @@ const clock = new THREE.Clock();
  */
 const tick = (timestamp) => {
   const elapsedTime = clock.getElapsedTime();
+  const deltaTime = elapsedTime - previousTime;
+  previousTime = elapsedTime;
+
+  // Update physics (with fixed time step)
+  updatePhysics(deltaTime);
 
   // Update third-person camera to follow the player
   updateThirdPersonCamera(camera, playerMesh);

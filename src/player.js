@@ -14,10 +14,9 @@ export const createPlayer = (scene, gui) => {
   });
   const player = new THREE.Mesh(geometry, material);
 
-  // Position the player to stand on the ground
-  // Capsule height is 2 units (radius 0.5 + height 1 + radius 0.5)
-  // We need to shift it up by half its height to make it stand on the ground
-  player.position.y = 1;
+  // Position the player higher to demonstrate gravity
+  // The physics system will make it fall onto the ground
+  player.position.y = 5;
 
   // Add the player to the scene
   scene.add(player);
