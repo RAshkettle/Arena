@@ -16,8 +16,12 @@ export const initPhysics = async () => {
   // Initialize Rapier physics engine with a single object parameter
   await RAPIER.init({});
 
-  // Create the physics world with gravity
-  world = new RAPIER.World(gravity);
+  // Create the physics world with gravity using the new object-based constructor
+  world = new RAPIER.World({
+    x: gravity.x,
+    y: gravity.y,
+    z: gravity.z,
+  });
 
   rapierLoaded = true;
   return true;
