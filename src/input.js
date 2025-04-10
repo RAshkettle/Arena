@@ -1,5 +1,5 @@
 /**
- * Input handler for keyboard controls
+ * Input handler for keyboard and mouse controls
  */
 class InputHandler {
   constructor() {
@@ -12,9 +12,21 @@ class InputHandler {
       jump: false, // Space
     };
 
-    // Set up event listeners
+    // Mouse movement tracking
+    this.mouseMovement = {
+      x: 0,
+      y: 0,
+    };
+
+    // Mouse sensitivity
+    this.sensitivity = 0.002;
+
+    // Set up event listeners for keyboard
     window.addEventListener("keydown", this.onKeyDown.bind(this));
     window.addEventListener("keyup", this.onKeyUp.bind(this));
+
+    // Set up event listener for mouse movement
+    document.addEventListener("mousemove", this.onMouseMove.bind(this));
   }
 
   /**
@@ -71,6 +83,25 @@ class InputHandler {
   }
 
   /**
+   * Handle mouse movement events
+   * @param {MouseEvent} event - The mouse event
+   */
+  onMouseMove(event) {
+    // Only track mouse movement if pointer is locked (using movementX/Y which is relative movement)
+    if (document.pointerLockElement) {
+      // Apply sensitivity to mouse movement
+      this.mouseMovement.x += event.movementX * this.sensitivity;
+      this.mouseMovement.y += event.movementY * this.sensitivity;
+
+      // Limit vertical look to avoid flipping
+      this.mouseMovement.y = Math.max(
+        Math.min(this.mouseMovement.y, Math.PI / 2 - 0.1),
+        -Math.PI / 2 + 0.1
+      );
+    }
+  }
+
+  /**
    * Get current movement direction based on keys pressed
    * @returns {Object} Movement direction vector
    */
@@ -78,6 +109,17 @@ class InputHandler {
     return {
       x: (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0),
       z: (this.keys.backward ? 1 : 0) - (this.keys.forward ? 1 : 0),
+    };
+  }
+
+  /**
+   * Get current player rotation based on mouse movement
+   * @returns {Object} Rotation in radians for x (vertical) and y (horizontal) axes
+   */
+  getPlayerRotation() {
+    return {
+      x: -this.mouseMovement.y, // Negative because up should look up
+      y: this.mouseMovement.x,
     };
   }
 

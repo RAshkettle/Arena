@@ -260,19 +260,24 @@ const updatePlayerCollider = (physicsObject, radius, halfHeight) => {
  * @param {number} deltaTime - Time step for the physics update
  * @param {Object} inputDirection - Direction input from player
  * @param {boolean} jumpRequested - Whether the player has requested to jump
+ * @param {Object} cameraRotation - Camera rotation from mouse input
  */
 export const updatePhysics = (
   deltaTime,
   inputDirection = { x: 0, z: 0 },
-  jumpRequested = false
+  jumpRequested = false,
+  cameraRotation = { x: 0, y: 0 }
 ) => {
   if (!world) return;
 
   // Process player movement and jump if player exists
   const playerPhysics = getPlayerPhysics();
   if (playerPhysics) {
-    // Handle player movement
-    movePlayer(playerPhysics.body, inputDirection, deltaTime);
+    // Rotate input direction based on camera rotation
+    const rotatedDirection = rotateDirectionWithCamera(inputDirection, cameraRotation);
+    
+    // Handle player movement with rotated direction
+    movePlayer(playerPhysics.body, rotatedDirection, deltaTime);
 
     // Handle jumping
     if (jumpRequested && isPlayerOnGround(playerPhysics.body)) {
@@ -304,6 +309,9 @@ export const updatePhysics = (
         }
       }
     }
+
+    // Always update player rotation to face the camera direction
+    updatePlayerRotation(playerPhysics.mesh, cameraRotation);
   }
 
   // Step the physics simulation
@@ -317,17 +325,40 @@ export const updatePhysics = (
       obj.mesh.position.x = position.x;
       obj.mesh.position.y = position.y;
       obj.mesh.position.z = position.z;
-
-      // Only rotate the player group to face the direction of movement
-      // if it's not controlled by the debug UI
-      if (inputDirection.x !== 0 || inputDirection.z !== 0) {
-        // Calculate angle based on input direction
-        const angle = Math.atan2(inputDirection.x, inputDirection.z);
-        obj.mesh.rotation.y = angle;
-      }
+      
+      // Rotation is now handled by updatePlayerRotation
     }
     // Ground is static, so no need to update its position
   }
+};
+
+/**
+ * Rotates the input direction to align with camera rotation
+ * @param {Object} direction - Raw input direction 
+ * @param {Object} cameraRotation - Camera rotation
+ * @returns {Object} - Rotated direction vector
+ */
+const rotateDirectionWithCamera = (direction, cameraRotation) => {
+  if (direction.x === 0 && direction.z === 0) return direction;
+  
+  const angle = cameraRotation.y;
+  
+  return {
+    x: direction.x * Math.cos(angle) - direction.z * Math.sin(angle),
+    z: direction.x * Math.sin(angle) + direction.z * Math.cos(angle)
+  };
+};
+
+/**
+ * Updates the player rotation to face the direction the camera is pointing
+ * @param {THREE.Group|THREE.Mesh} playerMesh - The player mesh or group
+ * @param {Object} cameraRotation - Camera rotation
+ */
+const updatePlayerRotation = (playerMesh, cameraRotation) => {
+  if (!playerMesh) return;
+  
+  // Set player rotation to match camera's horizontal rotation
+  playerMesh.rotation.y = cameraRotation.y;
 };
 
 /**

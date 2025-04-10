@@ -8,7 +8,7 @@ import {
   updateThirdPersonCamera,
 } from "./camera";
 import { createControls } from "./controls";
-import { createScene, createGround } from "./scene";
+import { createScene, createGround, createSkybox } from "./scene";
 import { createPlayer } from "./player";
 import {
   setupResizeHandler,
@@ -68,6 +68,9 @@ scene.add(ambientLight);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
+
+// Add skybox to the scene
+createSkybox(scene);
 
 // Set the scene reference for physics debugging
 setPhysicsScene(scene);
@@ -189,6 +192,7 @@ const tick = (timestamp) => {
     // Get player input
     const movementDirection = inputHandler.getMovementDirection();
     const jumpPressed = inputHandler.isJumpPressed();
+    const playerRotation = inputHandler.getPlayerRotation();
 
     // Normalize movement direction if needed
     if (movementDirection.x !== 0 && movementDirection.z !== 0) {
@@ -200,20 +204,26 @@ const tick = (timestamp) => {
       movementDirection.z /= length;
     }
 
-    // Update physics with player input
-    updatePhysics(deltaTime, movementDirection, jumpPressed);
+    // Update physics with player input and camera rotation
+    updatePhysics(deltaTime, movementDirection, jumpPressed, playerRotation);
 
     // Reset jump to prevent continuous jumping while holding space
     if (jumpPressed) {
       inputHandler.resetJump();
     }
+    
+    // Update third-person camera to follow the player
+    updateThirdPersonCamera(camera, playerMesh, playerRotation);
   } else {
     // When not in game mode, pass zero movement
-    updatePhysics(deltaTime, { x: 0, z: 0 }, false);
+    const playerRotation = inputHandler.getPlayerRotation();
+    
+    // Still update physics with rotation even when not moving
+    updatePhysics(deltaTime, { x: 0, z: 0 }, false, playerRotation);
+    
+    // Update camera position
+    updateThirdPersonCamera(camera, playerMesh, playerRotation);
   }
-
-  // Update third-person camera to follow the player
-  updateThirdPersonCamera(camera, playerMesh);
 
   // Update controls
   controls.update();

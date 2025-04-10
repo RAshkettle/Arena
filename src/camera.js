@@ -32,18 +32,37 @@ export const updateCameraAspect = (camera, windowSize) => {
 };
 
 /**
- * Updates the camera position to follow the player in third-person view
+ * Updates the camera position to always be behind the player
  * @param {THREE.PerspectiveCamera} camera - The camera to update
  * @param {THREE.Group|THREE.Mesh} player - The player object to follow
+ * @param {Object} [cameraRotation] - Camera rotation from mouse input
+ * @param {number} [cameraRotation.x] - X-axis rotation (pitch)
+ * @param {number} [cameraRotation.y] - Y-axis rotation (yaw)
  */
-export const updateThirdPersonCamera = (camera, player) => {
-  // Position the camera 4 units behind and 2 units above the player
+export const updateThirdPersonCamera = (camera, player, cameraRotation = { x: 0, y: 0 }) => {
+  // Camera settings
+  const cameraDistance = 4;
+  const cameraHeight = 2;
+  
+  // Get player rotation around Y axis
+  const playerAngle = player.rotation.y;
+  
+  // Apply pitch (vertical angle) from mouse input
+  const cameraPhi = cameraRotation.x; 
+  
+  // Calculate camera position to be directly behind the player
+  // Use player's rotation angle for horizontal positioning
+  const x = -Math.sin(playerAngle) * Math.cos(cameraPhi) * cameraDistance;
+  const y = Math.sin(cameraPhi) * cameraDistance + cameraHeight;
+  const z = -Math.cos(playerAngle) * Math.cos(cameraPhi) * cameraDistance;
+  
+  // Position camera relative to player
   camera.position.set(
-    player.position.x,
-    player.position.y + 2,
-    player.position.z + 4
+    player.position.x + x,
+    player.position.y + y,
+    player.position.z + z
   );
-
-  // Look at the player (slightly above its base to target more at the head)
+  
+  // Look at the player (slightly above its base)
   camera.lookAt(player.position.x, player.position.y + 0.5, player.position.z);
 };
