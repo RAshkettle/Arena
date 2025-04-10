@@ -8,7 +8,7 @@ import {
   updateThirdPersonCamera,
 } from "./camera";
 import { createControls } from "./controls";
-import { createScene, createGround, createSkybox } from "./scene";
+import { createScene, createGround, createSkybox, createWalls } from "./scene";
 import { createPlayer, updatePlayerAnimations } from "./player";
 import {
   setupResizeHandler,
@@ -71,6 +71,9 @@ scene.add(directionalLight);
 
 // Add skybox to the scene
 createSkybox(scene);
+
+// Add walls to the scene
+createWalls(scene, gui);
 
 // Set the scene reference for physics debugging
 setPhysicsScene(scene);

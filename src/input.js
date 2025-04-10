@@ -89,15 +89,14 @@ class InputHandler {
   onMouseMove(event) {
     // Only track mouse movement if pointer is locked (using movementX/Y which is relative movement)
     if (document.pointerLockElement) {
-      // Apply sensitivity to mouse movement
+      // Apply sensitivity to mouse movement - only horizontal (X) movement
       this.mouseMovement.x += event.movementX * this.sensitivity;
-      this.mouseMovement.y += event.movementY * this.sensitivity;
 
-      // Limit vertical look to avoid flipping
-      this.mouseMovement.y = Math.max(
-        Math.min(this.mouseMovement.y, Math.PI / 2 - 0.1),
-        -Math.PI / 2 + 0.1
-      );
+      // No longer tracking vertical mouse movement
+      // this.mouseMovement.y += event.movementY * this.sensitivity;
+
+      // Keep the vertical rotation at 0 to completely disable up/down camera movement
+      this.mouseMovement.y = 0;
     }
   }
 
