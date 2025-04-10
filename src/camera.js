@@ -34,7 +34,7 @@ export const updateCameraAspect = (camera, windowSize) => {
 /**
  * Updates the camera position to follow the player in third-person view
  * @param {THREE.PerspectiveCamera} camera - The camera to update
- * @param {THREE.Mesh} player - The player mesh to follow
+ * @param {THREE.Group|THREE.Mesh} player - The player object to follow
  */
 export const updateThirdPersonCamera = (camera, player) => {
   // Position the camera 4 units behind and 2 units above the player

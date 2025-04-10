@@ -75,18 +75,18 @@ export const createGroundCollider = (groundMesh) => {
 
 /**
  * Creates a dynamic capsule collider for the player
- * @param {THREE.Mesh} playerMesh - The mesh representing the player
+ * @param {THREE.Group} playerGroup - The group containing the player mesh
  * @returns {RAPIER.RigidBody} The created rigid body
  */
-export const createPlayerCollider = (playerMesh) => {
+export const createPlayerCollider = (playerGroup) => {
   if (!world) return null;
 
   // Create a dynamic rigid body for the player
   const playerRigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
     .setTranslation(
-      playerMesh.position.x,
-      playerMesh.position.y,
-      playerMesh.position.z
+      playerGroup.position.x,
+      playerGroup.position.y,
+      playerGroup.position.z
     )
     // Lock rotation to prevent player from falling over
     .lockRotations();
@@ -101,9 +101,9 @@ export const createPlayerCollider = (playerMesh) => {
   const playerColliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
   const collider = world.createCollider(playerColliderDesc, playerRigidBody);
 
-  // Store reference to mesh for syncing
+  // Store reference to group for syncing
   physicsObjects.push({
-    mesh: playerMesh,
+    mesh: playerGroup,
     body: playerRigidBody,
     collider: collider,
     type: "player",
@@ -143,11 +143,18 @@ export const updatePhysics = (
   // Sync physics objects with meshes
   for (const obj of physicsObjects) {
     if (obj.type === "player") {
-      // Update player mesh position based on physics body
+      // Update player group position based on physics body
       const position = obj.body.translation();
       obj.mesh.position.x = position.x;
       obj.mesh.position.y = position.y;
       obj.mesh.position.z = position.z;
+
+      // Also rotate the player group to face the direction of movement
+      if (inputDirection.x !== 0 || inputDirection.z !== 0) {
+        // Calculate angle based on input direction
+        const angle = Math.atan2(inputDirection.x, inputDirection.z);
+        obj.mesh.rotation.y = angle;
+      }
     }
     // Ground is static, so no need to update its position
   }
