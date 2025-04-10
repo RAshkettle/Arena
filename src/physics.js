@@ -6,11 +6,18 @@ let physicsObjects = [];
 let gravity = { x: 0.0, y: -9.81, z: 0.0 };
 let rapierLoaded = false;
 let scene = null;
+let debugMeshes = {}; // Store debug visualization meshes
+let showColliders = false; // Toggle for collider visibility
 
 // Movement and jump settings
 const MOVE_SPEED = 2.0; // 2 units per second
 const JUMP_FORCE = 5.0; // Jump force
 const GROUND_DETECTION_DISTANCE = 0.1; // Distance to check for ground beneath player
+
+// Player collider dimensions
+const PLAYER_RADIUS = 0.5; // Radius of the capsule
+const PLAYER_HEIGHT = 1.8; // Height of the capsule (excluding hemispheres)
+const PLAYER_HALF_HEIGHT = 1; // Half-height for the capsule collider
 
 /**
  * Initializes the Rapier physics engine
@@ -39,6 +46,87 @@ export const initPhysics = async () => {
  */
 export const setPhysicsScene = (sceneRef) => {
   scene = sceneRef;
+};
+
+/**
+ * Toggle collider visibility
+ * @param {boolean} visible - Whether colliders should be visible
+ */
+export const toggleColliderVisibility = (visible) => {
+  showColliders = visible;
+
+  // Update visibility of all debug meshes
+  for (const id in debugMeshes) {
+    if (debugMeshes[id]) {
+      debugMeshes[id].visible = showColliders;
+    }
+  }
+};
+
+/**
+ * Creates a debug visualization mesh for a collider
+ * @param {RAPIER.Collider} collider - The collider to visualize
+ * @param {string} type - The type of collider
+ * @returns {THREE.Mesh} The debug mesh
+ */
+const createDebugMesh = (collider, type) => {
+  if (!scene) return null;
+
+  let mesh;
+  const material = new THREE.MeshBasicMaterial({
+    color: type === "player" ? 0x00ff00 : 0xff0000,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5,
+    depthTest: false,
+  });
+
+  if (type === "player") {
+    // Create capsule visualization
+    const geometry = new THREE.CapsuleGeometry(
+      PLAYER_RADIUS,
+      PLAYER_HEIGHT,
+      16,
+      8
+    );
+    mesh = new THREE.Mesh(geometry, material);
+  } else if (type === "ground") {
+    // Create box visualization for ground
+    const groundSize = 50;
+    const geometry = new THREE.BoxGeometry(groundSize, 0.2, groundSize);
+    mesh = new THREE.Mesh(geometry, material);
+  }
+
+  if (mesh) {
+    mesh.visible = showColliders;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  return null;
+};
+
+/**
+ * Updates the position and rotation of a debug mesh to match its collider
+ * @param {THREE.Mesh} mesh - The debug mesh
+ * @param {RAPIER.RigidBody} body - The rigid body
+ */
+const updateDebugMesh = (mesh, body) => {
+  if (!mesh || !body) return;
+
+  const position = body.translation();
+  const rotation = body.rotation();
+
+  mesh.position.set(position.x, position.y, position.z);
+
+  // Convert Rapier quaternion to Three.js quaternion
+  const quaternion = new THREE.Quaternion(
+    rotation.x,
+    rotation.y,
+    rotation.z,
+    rotation.w
+  );
+  mesh.quaternion.copy(quaternion);
 };
 
 /**
@@ -71,19 +159,29 @@ export const createGroundCollider = (groundMesh) => {
 
   const collider = world.createCollider(groundColliderDesc, groundRigidBody);
 
+  // Create debug visualization for ground
+  const debugMesh = createDebugMesh(collider, "ground");
+
   // Store reference to mesh for syncing
   physicsObjects.push({
     mesh: groundMesh,
     body: groundRigidBody,
     collider: collider,
     type: "ground",
+    debugId: debugMesh ? `ground-${Date.now()}` : null,
   });
+
+  // Store debug mesh if created
+  if (debugMesh) {
+    const debugId = `ground-${Date.now()}`;
+    debugMeshes[debugId] = debugMesh;
+  }
 
   return collider;
 };
 
 /**
- * Creates a dynamic point-based physics object for the player
+ * Creates a dynamic capsule-based physics object for the player
  * @param {THREE.Group} playerGroup - The group containing the player mesh
  * @param {object} gui - The GUI instance for adding controls
  * @returns {RAPIER.RigidBody} The created rigid body
@@ -103,10 +201,22 @@ export const createPlayerCollider = (playerGroup, gui) => {
 
   const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
 
-  // Create a ball collider as a simple replacement for the capsule
-  const radius = 0.5;
-  const playerColliderDesc = RAPIER.ColliderDesc.ball(radius);
+  // Create a capsule collider for the player
+  // The capsule is oriented along the y-axis with half the height in each direction
+  const playerColliderDesc = RAPIER.ColliderDesc.capsule(
+    PLAYER_HALF_HEIGHT,
+    PLAYER_RADIUS
+  );
   const collider = world.createCollider(playerColliderDesc, playerRigidBody);
+
+  // Create debug visualization for capsule
+  const debugMesh = createDebugMesh(collider, "player");
+  const debugId = debugMesh ? `player-${Date.now()}` : null;
+
+  // Store debug mesh if created
+  if (debugMesh) {
+    debugMeshes[debugId] = debugMesh;
+  }
 
   // Store reference to group for syncing
   const physicsObject = {
@@ -114,9 +224,19 @@ export const createPlayerCollider = (playerGroup, gui) => {
     body: playerRigidBody,
     collider: collider,
     type: "player",
+    debugId: debugId,
   };
 
   physicsObjects.push(physicsObject);
+
+  // Add GUI controls for collider visibility if GUI is provided
+  if (gui) {
+    const physicsFolder = gui.addFolder("Physics");
+    physicsFolder
+      .add({ showColliders: showColliders }, "showColliders")
+      .name("Show Colliders")
+      .onChange(toggleColliderVisibility);
+  }
 
   return playerRigidBody;
 };
@@ -171,8 +291,16 @@ export const updatePhysics = (
       obj.mesh.position.x = position.x;
       obj.mesh.position.y = position.y;
       obj.mesh.position.z = position.z;
+
+      // Update debug mesh if it exists
+      if (obj.debugId && debugMeshes[obj.debugId]) {
+        updateDebugMesh(debugMeshes[obj.debugId], obj.body);
+      }
     }
-    // Ground is static, so no need to update its position
+    // Ground is static, but we still need to update its debug mesh if it exists
+    else if (obj.type === "ground" && obj.debugId && debugMeshes[obj.debugId]) {
+      updateDebugMesh(debugMeshes[obj.debugId], obj.body);
+    }
   }
 };
 

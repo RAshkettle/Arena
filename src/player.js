@@ -286,24 +286,12 @@ export const loadPlayer = async (scene) => {
         playerGroup = new THREE.Group();
         playerGroup.add(model);
 
-        // Store the original model dimensions for scale updates
-        playerGroup.userData = {
-          originalHeight: boundingBox.max.y - boundingBox.min.y,
-          originalWidth: Math.max(
-            boundingBox.max.x - boundingBox.min.x,
-            boundingBox.max.z - boundingBox.min.z
-          ),
-          scale: { x: 1.0, y: 1.0, z: 1.0 },
-          boundingBox: boundingBox.clone(),
-        };
-
         // Add the player group to the scene
         scene.add(playerGroup);
 
-        // Create physics collider for the player
-        createPlayerCollider(playerGroup);
+        // Note: Removed duplicate createPlayerCollider call here - physics collider is created in main.js
 
-        resolve(playerGroup);
+        resolve(model);
       },
       (xhr) => {
         // Progress callback without console.log

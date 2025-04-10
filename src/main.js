@@ -59,7 +59,7 @@ const windowSize = {
 // Setup scene and objects
 const scene = createScene();
 const groundMesh = createGround(scene, gui);
-const playerMesh = createPlayer(scene, gui);
+const playerGroup = createPlayer(scene, gui);
 
 // Add lights to the scene for the midnight moonlight effect
 const ambientLight = new THREE.AmbientLight(0x050512, 0.15); // Very dim dark blue ambient light for midnight
@@ -135,7 +135,7 @@ let groundCollider = null;
 initPhysics().then(() => {
   // Create physics colliders
   groundCollider = createGroundCollider(groundMesh);
-  playerBody = createPlayerCollider(playerMesh, gui); // Pass GUI for debug controls
+  playerBody = createPlayerCollider(playerGroup, gui); // Pass GUI for debug controls
 
   if (debug) {
     // Add physics controls to GUI
@@ -232,7 +232,7 @@ const tick = (timestamp) => {
     }
 
     // Update third-person camera to follow the player
-    updateThirdPersonCamera(camera, playerMesh, playerRotation);
+    updateThirdPersonCamera(camera, playerGroup, playerRotation);
 
     // Update player animations based on movement
     updatePlayerAnimations(deltaTime, movementDirection);
@@ -244,7 +244,7 @@ const tick = (timestamp) => {
     updatePhysics(deltaTime, { x: 0, z: 0 }, false, playerRotation);
 
     // Update camera position
-    updateThirdPersonCamera(camera, playerMesh, playerRotation);
+    updateThirdPersonCamera(camera, playerGroup, playerRotation);
 
     // Update animations with zero movement (should trigger idle animation)
     updatePlayerAnimations(deltaTime, { x: 0, z: 0 });
