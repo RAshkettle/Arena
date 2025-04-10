@@ -9,7 +9,7 @@ import {
 } from "./camera";
 import { createControls } from "./controls";
 import { createScene, createGround, createSkybox } from "./scene";
-import { createPlayer } from "./player";
+import { createPlayer, updatePlayerAnimations } from "./player";
 import {
   setupResizeHandler,
   setupFullscreenHandler,
@@ -214,6 +214,9 @@ const tick = (timestamp) => {
 
     // Update third-person camera to follow the player
     updateThirdPersonCamera(camera, playerMesh, playerRotation);
+
+    // Update player animations based on movement
+    updatePlayerAnimations(deltaTime, movementDirection);
   } else {
     // When not in game mode, pass zero movement
     const playerRotation = inputHandler.getPlayerRotation();
@@ -223,6 +226,9 @@ const tick = (timestamp) => {
 
     // Update camera position
     updateThirdPersonCamera(camera, playerMesh, playerRotation);
+
+    // Update animations with zero movement (should trigger idle animation)
+    updatePlayerAnimations(deltaTime, { x: 0, z: 0 });
   }
 
   // Update controls

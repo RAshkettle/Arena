@@ -39,76 +39,35 @@ export const createPlayer = (scene, gui) => {
   // Store a reference to the player mesh on the group
   playerGroup.playerMesh = tempMesh;
 
-  // Load the Skeleton model
-  const loader = new GLTFLoader();
-  loader.load(
-    "assets/Skeleton.glb",
-    (gltf) => {
+  // Use loadPlayer instead of directly loading the model here
+  loadPlayer(scene)
+    .then((loadedPlayerGroup) => {
       // Remove the temporary capsule
       playerGroup.remove(tempMesh);
 
-      const model = gltf.scene;
-
-      // Modify material properties to look more like bone
-      model.traverse((node) => {
-        if (node.isMesh && node.material) {
-          // Handle both single materials and material arrays
-          const materials = Array.isArray(node.material) ? node.material : [node.material];
-          
-          materials.forEach(material => {
-            // Make material more bone-like (less reflective, more matte)
-            material.roughness = 0.9;       // High roughness for matte appearance
-            material.metalness = 0.1;       // Low metalness for non-metallic look
-            material.color.set(0xf0efe7);   // Slightly off-white bone color
-            material.emissive.set(0x000000); // No emission
-            
-            // Optional: add subtle subsurface scattering effect if it's a MeshPhysicalMaterial
-            if (material.type === 'MeshPhysicalMaterial') {
-              material.transmission = 0.1;  // Slight translucency
-              material.clearcoat = 0.2;     // Subtle clearcoat for bone shine
-            }
-          });
-        }
-      });
-
-      // Get the bounding box of the model to calculate proper scaling
-      const boundingBox = new THREE.Box3().setFromObject(model);
-      const originalHeight = boundingBox.max.y - boundingBox.min.y;
-
-      // Calculate scale factor to make the model 2 units high
-      const targetHeight = 2.0;
-      const scaleFactor = targetHeight / originalHeight;
-
-      // Apply uniform scaling to maintain proportions
-      model.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-      // Update the bounding box after scaling
-      const scaledBoundingBox = new THREE.Box3().setFromObject(model);
-
-      // Calculate the offset needed to align the model with the physics collider
-      // The collider is a capsule with its origin at its center
-      const modelHeight = scaledBoundingBox.max.y - scaledBoundingBox.min.y;
-      const modelCenter = new THREE.Vector3();
-      scaledBoundingBox.getCenter(modelCenter);
-
-      // Position model so its feet are at y=0 and center of gravity aligns with collider
-      model.position.set(0, -scaledBoundingBox.min.y, 0);
-
-      // Add the model to the group
+      // Copy the loaded model to our player group
+      const model = loadedPlayerGroup.children[0];
       playerGroup.add(model);
 
       // Update the player mesh reference
       playerGroup.playerMesh = model;
 
-      console.log("Skeleton model loaded successfully");
-    },
-    (xhr) => {
-      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-    },
-    (error) => {
+      // Copy userData from loaded player
+      if (loadedPlayerGroup.userData) {
+        playerGroup.userData = {
+          ...playerGroup.userData,
+          ...loadedPlayerGroup.userData,
+        };
+      }
+
+      // Remove the loaded group since we've transferred its contents
+      scene.remove(loadedPlayerGroup);
+
+      console.log("Skeleton model loaded successfully with animations");
+    })
+    .catch((error) => {
       console.error("Error loading model:", error);
-    }
-  );
+    });
 
   // Create debug UI folders
   const playerFolder = gui.addFolder("Player Position");
@@ -265,24 +224,54 @@ export const loadPlayer = async (scene) => {
 
         // Create animations
         const animations = gltf.animations;
+        console.log(animations);
         if (animations && animations.length) {
           // Set up animation mixer and actions
           playerMixer = new THREE.AnimationMixer(model);
 
+          console.log(
+            "Model animations:",
+            animations.map((a) => a.name)
+          );
+
+          // Animation name mapping - map the actual animation names to simplified ones
+          const animationNameMap = {
+            "CharacterArmature|CharacterArmature|CharacterArmature|Idle|CharacterArmature|Idle":
+              "Idle",
+            // Map other animations as needed once identified
+          };
+
           // Create animation actions
           animations.forEach((clip) => {
             const action = playerMixer.clipAction(clip);
-            animationActions[clip.name] = action;
+
+            // Use the mapped name if available, otherwise use original name
+            const simplifiedName = animationNameMap[clip.name] || clip.name;
+            animationActions[simplifiedName] = action;
+
+            // Store original name mapping for debugging
+            if (animationNameMap[clip.name]) {
+              console.log(
+                `Mapped animation: "${clip.name}" → "${simplifiedName}"`
+              );
+            }
 
             // Set default animation parameters
-            action.clampWhenFinished = true;
+            action.clampWhenFinished = false; // Change to false to allow looping
             action.loop = THREE.LoopRepeat;
+            action.repetitions = Infinity; // Ensure it repeats indefinitely
           });
 
           // Set default animation
           currentAction = animationActions["Idle"];
           if (currentAction) {
             currentAction.play();
+            console.log("Started idle animation");
+          } else {
+            console.warn(
+              "Idle animation not found! Available animations:",
+              Object.keys(animationActions)
+            );
           }
         }
 
@@ -328,34 +317,6 @@ export const loadPlayer = async (scene) => {
 };
 
 /**
- * Sets the scale of the player
- * @param {object} scale - Scale values {x, y, z}
- */
-export const setPlayerScale = (scale) => {
-  if (!playerGroup || !playerModel) return;
-
-  // Apply scale to the model
-  playerModel.scale.set(scale.x, scale.y, scale.z);
-
-  // Store the scale for physics updates
-  playerGroup.userData.scale = {
-    x: scale.x,
-    y: scale.y,
-    z: scale.z,
-  };
-
-  // The scale is now synchronized between player model and collider
-  // Physics system will detect this change via the userData.scale property
-  // and update the collider dimensions accordingly in the next update cycle
-
-  // Update the player group position in the y direction based on the new scale
-  // This ensures the model's feet stay at y=0
-  const boundingBox = playerGroup.userData.boundingBox.clone();
-  boundingBox.min.y *= scale.y;
-  playerModel.position.y = -boundingBox.min.y;
-};
-
-/**
  * Updates the animations of the player
  * @param {number} deltaTime - Time step for animation update
  * @param {object} movementInput - Input for movement (x, z)
@@ -370,13 +331,32 @@ export const updatePlayerAnimations = (deltaTime, movementInput) => {
   const isMoving =
     Math.abs(movementInput.x) > 0.1 || Math.abs(movementInput.z) > 0.1;
 
+  // Debug: Log available animation names if we haven't already
+  if (!window.animationsLogged && animationActions) {
+    console.log("Available animations:", Object.keys(animationActions));
+    window.animationsLogged = true;
+  }
+
   // Change animation based on movement state
-  const targetAction = isMoving
-    ? animationActions["Walk"]
-    : animationActions["Idle"];
+  const targetAnimationName = isMoving ? "Walk" : "Idle";
+  const targetAction = animationActions[targetAnimationName];
+
+  // Debug: Log animation state
+  if (targetAction === undefined) {
+    console.warn(
+      `Animation "${targetAnimationName}" not found in model. Available animations:`,
+      Object.keys(animationActions)
+    );
+  }
 
   // Change animation if needed
   if (targetAction && currentAction !== targetAction) {
+    console.log(
+      `Switching animation from ${
+        currentAction ? previousAction?._clip.name : "none"
+      } to ${targetAnimationName}`
+    );
+
     previousAction = currentAction;
     currentAction = targetAction;
 
@@ -385,7 +365,11 @@ export const updatePlayerAnimations = (deltaTime, movementInput) => {
       previousAction.fadeOut(0.2);
     }
 
+    // Ensure loop settings are properly applied to new animation
     currentAction.reset();
+    currentAction.clampWhenFinished = false;
+    currentAction.loop = THREE.LoopRepeat;
+    currentAction.repetitions = Infinity;
     currentAction.fadeIn(0.2);
     currentAction.play();
   }
