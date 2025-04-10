@@ -85,13 +85,6 @@ export const setupPointerLockHandler = (canvas, onPointerLockChange = null) => {
     if (onPointerLockChange) {
       onPointerLockChange(pointerLocked);
     }
-
-    // Visual indication in the console
-    if (pointerLocked) {
-      console.log("Pointer locked - press ESC to release");
-    } else {
-      console.log("Pointer released - click to capture");
-    }
   });
 
   // Escape key handler to exit pointer lock

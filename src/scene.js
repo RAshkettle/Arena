@@ -8,7 +8,13 @@ import { TextureLoader } from "three";
  * @returns {THREE.Scene} The created scene
  */
 export const createScene = () => {
-  return new THREE.Scene();
+  const scene = new THREE.Scene();
+
+  // Add dense midnight fog
+  const fogColor = new THREE.Color(0x000814); // Darker blue/black color for midnight
+  scene.fog = new THREE.FogExp2(fogColor, 0.05); // Increased fog density for gloomier atmosphere
+
+  return scene;
 };
 
 /**
@@ -50,7 +56,6 @@ export const createSkybox = (scene, gui) => {
         scene.background = texture;
         scene.environment = texture;
 
-        console.log("Skybox loaded successfully");
         resolve(texture);
       },
       undefined,

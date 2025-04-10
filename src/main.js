@@ -61,13 +61,29 @@ const scene = createScene();
 const groundMesh = createGround(scene, gui);
 const playerMesh = createPlayer(scene, gui);
 
-// Add lights to the scene for the standard material
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// Add lights to the scene for the midnight moonlight effect
+const ambientLight = new THREE.AmbientLight(0x050512, 0.15); // Very dim dark blue ambient light for midnight
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 10, 5);
-scene.add(directionalLight);
+// Create moonlight (directional light with blue tint)
+const moonLight = new THREE.DirectionalLight(0xd8e8ff, 0.3); // Soft blue-white color with reduced intensity
+moonLight.position.set(-15, 25, -10); // Position to simulate moonlight coming from one side
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.width = 2048;
+moonLight.shadow.mapSize.height = 2048;
+moonLight.shadow.camera.far = 50;
+moonLight.shadow.bias = -0.0005; // Reduce shadow artifacts
+scene.add(moonLight);
+
+// Add a point light to simulate the full moon's glow
+const moonGlow = new THREE.PointLight(0xd0e0ff, 1, 200, 1.5); // Stronger blue-white light with distance attenuation
+moonGlow.position.set(-25, 40, -25); // Higher position for the moon
+scene.add(moonGlow);
+
+// Add a subtle flickering light to enhance the eerie atmosphere
+const flickerLight = new THREE.PointLight(0x7080a0, 0.2, 50, 2);
+flickerLight.position.set(5, 3, 5);
+scene.add(flickerLight);
 
 // Add skybox to the scene
 createSkybox(scene);

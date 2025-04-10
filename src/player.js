@@ -62,11 +62,9 @@ export const createPlayer = (scene, gui) => {
 
       // Remove the loaded group since we've transferred its contents
       scene.remove(loadedPlayerGroup);
-
-      console.log("Skeleton model loaded successfully with animations");
     })
     .catch((error) => {
-      console.error("Error loading model:", error);
+      // Error handling remains but without console.error
     });
 
   // Create debug UI folders
@@ -224,15 +222,9 @@ export const loadPlayer = async (scene) => {
 
         // Create animations
         const animations = gltf.animations;
-        console.log(animations);
         if (animations && animations.length) {
           // Set up animation mixer and actions
           playerMixer = new THREE.AnimationMixer(model);
-
-          console.log(
-            "Model animations:",
-            animations.map((a) => a.name)
-          );
 
           // Animation name mapping - map the actual animation names to simplified ones
           const animationNameMap = {
@@ -249,13 +241,6 @@ export const loadPlayer = async (scene) => {
             const simplifiedName = animationNameMap[clip.name] || clip.name;
             animationActions[simplifiedName] = action;
 
-            // Store original name mapping for debugging
-            if (animationNameMap[clip.name]) {
-              console.log(
-                `Mapped animation: "${clip.name}" → "${simplifiedName}"`
-              );
-            }
-
             // Set default animation parameters
             action.clampWhenFinished = false; // Change to false to allow looping
             action.loop = THREE.LoopRepeat;
@@ -266,12 +251,6 @@ export const loadPlayer = async (scene) => {
           currentAction = animationActions["Idle"];
           if (currentAction) {
             currentAction.play();
-            console.log("Started idle animation");
-          } else {
-            console.warn(
-              "Idle animation not found! Available animations:",
-              Object.keys(animationActions)
-            );
           }
         }
 
@@ -279,14 +258,18 @@ export const loadPlayer = async (scene) => {
         model.traverse((child) => {
           if (child.isMesh && child.material) {
             // Handle both single materials and material arrays
-            const materials = Array.isArray(child.material) ? child.material : [child.material];
-            
-            materials.forEach(material => {
-              if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
-                material.metalness = 0.1;  // Lower metallic to 0.1 as requested
-                material.roughness = 0.8;  // Increase roughness for a more bone-like appearance
+            const materials = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+
+            materials.forEach((material) => {
+              if (
+                material.isMeshStandardMaterial ||
+                material.isMeshPhysicalMaterial
+              ) {
+                material.metalness = 0.1; // Lower metallic to 0.1 as requested
+                material.roughness = 0.8; // Increase roughness for a more bone-like appearance
                 material.needsUpdate = true;
-                console.log("Updated material properties for bone-like appearance");
               }
             });
           }
@@ -323,10 +306,10 @@ export const loadPlayer = async (scene) => {
         resolve(playerGroup);
       },
       (xhr) => {
-        console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+        // Progress callback without console.log
       },
       (error) => {
-        console.error("An error happened while loading the player", error);
+        // Error callback without console.error
         reject(error);
       }
     );
@@ -348,32 +331,12 @@ export const updatePlayerAnimations = (deltaTime, movementInput) => {
   const isMoving =
     Math.abs(movementInput.x) > 0.1 || Math.abs(movementInput.z) > 0.1;
 
-  // Debug: Log available animation names if we haven't already
-  if (!window.animationsLogged && animationActions) {
-    console.log("Available animations:", Object.keys(animationActions));
-    window.animationsLogged = true;
-  }
-
   // Change animation based on movement state
   const targetAnimationName = isMoving ? "Walk" : "Idle";
   const targetAction = animationActions[targetAnimationName];
 
-  // Debug: Log animation state
-  if (targetAction === undefined) {
-    console.warn(
-      `Animation "${targetAnimationName}" not found in model. Available animations:`,
-      Object.keys(animationActions)
-    );
-  }
-
   // Change animation if needed
   if (targetAction && currentAction !== targetAction) {
-    console.log(
-      `Switching animation from ${
-        currentAction ? previousAction?._clip.name : "none"
-      } to ${targetAnimationName}`
-    );
-
     previousAction = currentAction;
     currentAction = targetAction;
 
