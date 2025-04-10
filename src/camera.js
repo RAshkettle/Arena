@@ -12,9 +12,12 @@ export const createCamera = (windowSize) => {
     75,
     windowSize.width / windowSize.height,
     0.1,
-    100
+    1000
   );
-  camera.position.z = 3;
+  // Position the camera back and up to look down at the plane at an angle
+  camera.position.set(20, 15, 20);
+  // Make the camera look toward the center of the scene
+  camera.lookAt(0, 0, 0);
   return camera;
 };
 

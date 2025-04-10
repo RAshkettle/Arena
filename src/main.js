@@ -4,7 +4,7 @@ import * as lil from "lil-gui";
 import { getNewRenderer } from "./renderer";
 import { createCamera, updateCameraAspect } from "./camera";
 import { createControls } from "./controls";
-import { createScene, createCube } from "./scene";
+import { createScene, createGround } from "./scene";
 import { setupResizeHandler, setupFullscreenHandler } from "./events";
 
 // Initialize GUI
@@ -27,7 +27,7 @@ const windowSize = {
 
 // Setup scene and objects
 const scene = createScene();
-const mesh = createCube(scene, gui);
+const mesh = createGround(scene, gui);
 
 // Setup camera
 const camera = createCamera(windowSize);
