@@ -15,3 +15,57 @@ body {
   overflow: hidden;
   background-color: black;
 }
+
+/* Pointer Lock UI */
+.pointer-lock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0); /* Removed background overlay */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Align to bottom */
+  align-items: flex-start; /* Align to left */
+  color: white;
+  font-family: Arial, sans-serif;
+  z-index: 10;
+  user-select: none;
+  pointer-events: none; /* Allow clicks to pass through to the canvas */
+  padding: 20px; /* Add padding around the entire overlay */
+  box-sizing: border-box;
+}
+
+.pointer-lock-overlay.hidden {
+  display: none;
+}
+
+.pointer-lock-message {
+  padding: 15px;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  text-align: left; /* Left-align text instead of center */
+  max-width: 300px; /* Limit width for better readability */
+  margin-bottom: 20px; /* Space from bottom */
+}
+
+.pointer-lock-message h2 {
+  margin-bottom: 10px;
+  color: #4caf50;
+  font-size: 1.2rem; /* Slightly smaller heading */
+}
+
+.pointer-lock-message p {
+  margin: 5px 0;
+  font-size: 0.9rem; /* Slightly smaller text */
+}
+
+.key {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 3px;
+  background-color: #333;
+  border-radius: 4px;
+  border: 1px solid #555;
+}

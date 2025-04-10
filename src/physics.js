@@ -5,11 +5,16 @@ let world;
 let physicsObjects = [];
 let gravity = { x: 0.0, y: -9.81, z: 0.0 };
 let rapierLoaded = false;
+let scene = null;
 
 // Movement and jump settings
 const MOVE_SPEED = 2.0; // 2 units per second
 const JUMP_FORCE = 5.0; // Jump force
 const GROUND_DETECTION_DISTANCE = 0.1; // Distance to check for ground beneath player
+
+// Original collider dimensions for the player
+const DEFAULT_CAPSULE_RADIUS = 0.5;
+const DEFAULT_CAPSULE_HEIGHT = 0.5; // Half-height of the cylinder part
 
 /**
  * Initializes the Rapier physics engine
@@ -30,6 +35,14 @@ export const initPhysics = async () => {
 
   rapierLoaded = true;
   return true;
+};
+
+/**
+ * Sets the scene reference for debug visualization
+ * @param {THREE.Scene} sceneRef - Reference to the Three.js scene
+ */
+export const setPhysicsScene = (sceneRef) => {
+  scene = sceneRef;
 };
 
 /**
@@ -76,9 +89,10 @@ export const createGroundCollider = (groundMesh) => {
 /**
  * Creates a dynamic capsule collider for the player
  * @param {THREE.Group} playerGroup - The group containing the player mesh
+ * @param {object} gui - The GUI instance for adding controls
  * @returns {RAPIER.RigidBody} The created rigid body
  */
-export const createPlayerCollider = (playerGroup) => {
+export const createPlayerCollider = (playerGroup, gui) => {
   if (!world) return null;
 
   // Create a dynamic rigid body for the player
@@ -95,21 +109,150 @@ export const createPlayerCollider = (playerGroup) => {
 
   // Create a capsule collider
   // Parameters: half-height of the cylinder part, radius
-  const halfHeight = 0.5; // Half of cylinder part (1 unit)
-  const radius = 0.5; // Capsule radius
+  const halfHeight = DEFAULT_CAPSULE_HEIGHT;
+  const radius = DEFAULT_CAPSULE_RADIUS;
 
   const playerColliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
   const collider = world.createCollider(playerColliderDesc, playerRigidBody);
 
   // Store reference to group for syncing
-  physicsObjects.push({
+  const physicsObject = {
     mesh: playerGroup,
     body: playerRigidBody,
     collider: collider,
     type: "player",
-  });
+    colliderDimensions: {
+      radius: radius,
+      halfHeight: halfHeight,
+    },
+  };
+
+  physicsObjects.push(physicsObject);
+
+  // Create debug controls for the collider if GUI is provided
+  if (gui) {
+    const colliderFolder = gui.addFolder("Player Collider");
+    const colliderParams = {
+      showCollider: false,
+      radius: radius,
+      height: halfHeight * 2,
+    };
+
+    // Add controls for collider visibility
+    colliderFolder
+      .add(colliderParams, "showCollider")
+      .name("Show Collider")
+      .onChange((value) => {
+        if (value) {
+          createColliderHelper(playerGroup, physicsObject);
+        } else {
+          removeColliderHelper(playerGroup);
+        }
+      });
+
+    // Add controls for collider dimensions
+    colliderFolder
+      .add(colliderParams, "radius")
+      .min(0.1)
+      .max(2)
+      .step(0.1)
+      .name("Radius")
+      .onChange((value) => {
+        updatePlayerCollider(physicsObject, value, colliderParams.height / 2);
+        // Update visual representation if visible
+        if (colliderParams.showCollider) {
+          removeColliderHelper(playerGroup);
+          createColliderHelper(playerGroup, physicsObject);
+        }
+      });
+
+    colliderFolder
+      .add(colliderParams, "height")
+      .min(0.2)
+      .max(4)
+      .step(0.1)
+      .name("Height")
+      .onChange((value) => {
+        updatePlayerCollider(physicsObject, colliderParams.radius, value / 2);
+        // Update visual representation if visible
+        if (colliderParams.showCollider) {
+          removeColliderHelper(playerGroup);
+          createColliderHelper(playerGroup, physicsObject);
+        }
+      });
+  }
 
   return playerRigidBody;
+};
+
+/**
+ * Creates a visual helper for the player's collider
+ * @param {THREE.Group} playerGroup - The player group
+ * @param {Object} physicsObject - The physics object containing the collider
+ */
+const createColliderHelper = (playerGroup, physicsObject) => {
+  if (!scene) return;
+
+  removeColliderHelper(playerGroup); // Remove existing helper first
+
+  // Create a wireframe capsule to visualize the collider
+  const radius = physicsObject.colliderDimensions.radius;
+  const halfHeight = physicsObject.colliderDimensions.halfHeight;
+
+  const geometry = new THREE.CapsuleGeometry(radius, halfHeight * 2, 16, 8);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    wireframe: true,
+    opacity: 0.5,
+    transparent: true,
+  });
+
+  const colliderHelper = new THREE.Mesh(geometry, material);
+  playerGroup.add(colliderHelper);
+
+  // Store reference to the helper
+  playerGroup.userData.colliderHelper = colliderHelper;
+};
+
+/**
+ * Removes the visual helper for the player's collider
+ * @param {THREE.Group} playerGroup - The player group
+ */
+const removeColliderHelper = (playerGroup) => {
+  if (playerGroup.userData.colliderHelper) {
+    playerGroup.remove(playerGroup.userData.colliderHelper);
+    playerGroup.userData.colliderHelper = null;
+  }
+};
+
+/**
+ * Updates the player collider dimensions
+ * @param {Object} physicsObject - The physics object containing the collider
+ * @param {number} radius - The new radius for the capsule collider
+ * @param {number} halfHeight - The new half-height for the capsule collider
+ */
+const updatePlayerCollider = (physicsObject, radius, halfHeight) => {
+  if (!physicsObject || !world) return;
+
+  // Store the current body position before removing the old collider
+  const currentPos = physicsObject.body.translation();
+  const currentVel = physicsObject.body.linvel();
+
+  // Remove the current collider
+  world.removeCollider(physicsObject.collider, true);
+
+  // Create a new collider with the updated dimensions
+  const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
+  physicsObject.collider = world.createCollider(
+    colliderDesc,
+    physicsObject.body
+  );
+
+  // Update stored dimensions
+  physicsObject.colliderDimensions = {
+    radius: radius,
+    halfHeight: halfHeight,
+  };
 };
 
 /**
@@ -135,6 +278,32 @@ export const updatePhysics = (
     if (jumpRequested && isPlayerOnGround(playerPhysics.body)) {
       playerJump(playerPhysics.body);
     }
+
+    // Check for scale changes and update collider if needed
+    const playerGroup = playerPhysics.mesh;
+    if (playerGroup.userData && playerGroup.userData.scale) {
+      const scale = playerGroup.userData.scale;
+
+      // Check if scale has changed enough to warrant updating the collider
+      const currentRadius = playerPhysics.colliderDimensions.radius;
+      const currentHalfHeight = playerPhysics.colliderDimensions.halfHeight;
+
+      const targetRadius = DEFAULT_CAPSULE_RADIUS * ((scale.x + scale.z) / 2);
+      const targetHalfHeight = DEFAULT_CAPSULE_HEIGHT * scale.y;
+
+      if (
+        Math.abs(targetRadius - currentRadius) > 0.01 ||
+        Math.abs(targetHalfHeight - currentHalfHeight) > 0.01
+      ) {
+        updatePlayerCollider(playerPhysics, targetRadius, targetHalfHeight);
+
+        // Update collider helper if it exists
+        if (playerGroup.userData.colliderHelper) {
+          removeColliderHelper(playerGroup);
+          createColliderHelper(playerGroup, playerPhysics);
+        }
+      }
+    }
   }
 
   // Step the physics simulation
@@ -149,7 +318,8 @@ export const updatePhysics = (
       obj.mesh.position.y = position.y;
       obj.mesh.position.z = position.z;
 
-      // Also rotate the player group to face the direction of movement
+      // Only rotate the player group to face the direction of movement
+      // if it's not controlled by the debug UI
       if (inputDirection.x !== 0 || inputDirection.z !== 0) {
         // Calculate angle based on input direction
         const angle = Math.atan2(inputDirection.x, inputDirection.z);

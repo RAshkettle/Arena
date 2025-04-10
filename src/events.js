@@ -43,3 +43,71 @@ export const setupFullscreenHandler = (canvas) => {
     }
   });
 };
+
+/**
+ * State for tracking if pointer is locked
+ * @type {boolean}
+ */
+let pointerLocked = false;
+
+/**
+ * Sets up event handlers for pointer lock (mouse capture) on click and release on escape
+ * @param {HTMLElement} canvas - The DOM element to lock the pointer to
+ * @param {Function} onPointerLockChange - Callback function when pointer lock state changes
+ */
+export const setupPointerLockHandler = (canvas, onPointerLockChange = null) => {
+  // Get the pointer lock overlay element
+  const overlay = document.getElementById("pointerLockOverlay");
+
+  // Click handler to request pointer lock
+  canvas.addEventListener("click", () => {
+    if (!pointerLocked) {
+      // Request pointer lock
+      canvas.requestPointerLock();
+    }
+  });
+
+  // Pointer lock change handler
+  document.addEventListener("pointerlockchange", () => {
+    // Update pointer lock state
+    pointerLocked = document.pointerLockElement === canvas;
+
+    // Toggle overlay visibility based on pointer lock state
+    if (overlay) {
+      if (pointerLocked) {
+        overlay.classList.add("hidden");
+      } else {
+        overlay.classList.remove("hidden");
+      }
+    }
+
+    // Call callback if provided
+    if (onPointerLockChange) {
+      onPointerLockChange(pointerLocked);
+    }
+
+    // Visual indication in the console
+    if (pointerLocked) {
+      console.log("Pointer locked - press ESC to release");
+    } else {
+      console.log("Pointer released - click to capture");
+    }
+  });
+
+  // Escape key handler to exit pointer lock
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && pointerLocked) {
+      // Pointer lock is automatically released on Escape,
+      // but we handle it here for clarity
+      document.exitPointerLock();
+    }
+  });
+};
+
+/**
+ * Checks if the pointer is currently locked
+ * @returns {boolean} True if the pointer is locked, false otherwise
+ */
+export const isPointerLocked = () => {
+  return pointerLocked;
+};

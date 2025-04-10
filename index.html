@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,6 +8,21 @@
   </head>
   <body>
     <canvas class="webgl"></canvas>
+
+    <!-- Pointer Lock Overlay -->
+    <div id="pointerLockOverlay" class="pointer-lock-overlay">
+      <div class="pointer-lock-message">
+        <h2>Arena</h2>
+        <p>Click anywhere to play</p>
+        <p>
+          Move: <span class="key">W</span><span class="key">A</span
+          ><span class="key">S</span><span class="key">D</span> Jump:
+          <span class="key">SPACE</span>
+        </p>
+        <p>Press <span class="key">ESC</span> to exit game</p>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

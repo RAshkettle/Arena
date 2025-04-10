@@ -10,7 +10,12 @@ import {
 import { createControls } from "./controls";
 import { createScene, createGround } from "./scene";
 import { createPlayer } from "./player";
-import { setupResizeHandler, setupFullscreenHandler } from "./events";
+import {
+  setupResizeHandler,
+  setupFullscreenHandler,
+  setupPointerLockHandler,
+  isPointerLocked,
+} from "./events";
 import {
   initPhysics,
   createGroundCollider,
@@ -18,6 +23,7 @@ import {
   updatePhysics,
   setPlayerPosition,
   getPlayerPhysics,
+  setPhysicsScene,
 } from "./physics";
 import InputHandler from "./input";
 
@@ -63,6 +69,9 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
 
+// Set the scene reference for physics debugging
+setPhysicsScene(scene);
+
 // Setup camera
 const camera = createCamera(windowSize);
 
@@ -75,6 +84,18 @@ const renderer = getNewRenderer(canvas, windowSize);
 // Setup event handlers
 setupResizeHandler(windowSize, camera, renderer);
 setupFullscreenHandler(canvas);
+setupPointerLockHandler(canvas, (locked) => {
+  // Handle pointer lock state changes
+  // You could show/hide UI elements, enable/disable controls, etc.
+  if (debug) {
+    // Toggle GUI visibility based on pointer lock state
+    if (locked) {
+      gui.hide();
+    } else if (debug) {
+      gui.show();
+    }
+  }
+});
 
 // Initial resize
 updateCameraAspect(camera, windowSize);
@@ -92,7 +113,7 @@ let groundCollider = null;
 initPhysics().then(() => {
   // Create physics colliders
   groundCollider = createGroundCollider(groundMesh);
-  playerBody = createPlayerCollider(playerMesh);
+  playerBody = createPlayerCollider(playerMesh, gui); // Pass GUI for debug controls
 
   if (debug) {
     // Add physics controls to GUI
@@ -119,7 +140,7 @@ if (debug) {
 
     controllers.forEach((controller) => {
       const property = controller.property;
-      if (property === "x" || property === "z") {
+      if (property === "x" || property === "y" || property === "z") {
         const originalOnChange = controller.onChange;
         controller.onChange((value) => {
           // Call original handler if it exists
@@ -135,7 +156,7 @@ if (debug) {
               setPlayerPosition(
                 physics.body,
                 property === "x" ? value : pos.x,
-                pos.y,
+                property === "y" ? value : pos.y,
                 property === "z" ? value : pos.z
               );
             }
@@ -163,26 +184,32 @@ const tick = (timestamp) => {
   const deltaTime = elapsedTime - previousTime;
   previousTime = elapsedTime;
 
-  // Get player input
-  const movementDirection = inputHandler.getMovementDirection();
-  const jumpPressed = inputHandler.isJumpPressed();
+  // Only process movement input if pointer is locked (in game mode)
+  if (isPointerLocked()) {
+    // Get player input
+    const movementDirection = inputHandler.getMovementDirection();
+    const jumpPressed = inputHandler.isJumpPressed();
 
-  // Normalize movement direction if needed
-  if (movementDirection.x !== 0 && movementDirection.z !== 0) {
-    const length = Math.sqrt(
-      movementDirection.x * movementDirection.x +
-        movementDirection.z * movementDirection.z
-    );
-    movementDirection.x /= length;
-    movementDirection.z /= length;
-  }
+    // Normalize movement direction if needed
+    if (movementDirection.x !== 0 && movementDirection.z !== 0) {
+      const length = Math.sqrt(
+        movementDirection.x * movementDirection.x +
+          movementDirection.z * movementDirection.z
+      );
+      movementDirection.x /= length;
+      movementDirection.z /= length;
+    }
 
-  // Update physics with player input
-  updatePhysics(deltaTime, movementDirection, jumpPressed);
+    // Update physics with player input
+    updatePhysics(deltaTime, movementDirection, jumpPressed);
 
-  // Reset jump to prevent continuous jumping while holding space
-  if (jumpPressed) {
-    inputHandler.resetJump();
+    // Reset jump to prevent continuous jumping while holding space
+    if (jumpPressed) {
+      inputHandler.resetJump();
+    }
+  } else {
+    // When not in game mode, pass zero movement
+    updatePhysics(deltaTime, { x: 0, z: 0 }, false);
   }
 
   // Update third-person camera to follow the player
