@@ -211,16 +211,16 @@ const tick = (timestamp) => {
     if (jumpPressed) {
       inputHandler.resetJump();
     }
-    
+
     // Update third-person camera to follow the player
     updateThirdPersonCamera(camera, playerMesh, playerRotation);
   } else {
     // When not in game mode, pass zero movement
     const playerRotation = inputHandler.getPlayerRotation();
-    
+
     // Still update physics with rotation even when not moving
     updatePhysics(deltaTime, { x: 0, z: 0 }, false, playerRotation);
-    
+
     // Update camera position
     updateThirdPersonCamera(camera, playerMesh, playerRotation);
   }

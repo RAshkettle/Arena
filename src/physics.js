@@ -12,10 +12,6 @@ const MOVE_SPEED = 2.0; // 2 units per second
 const JUMP_FORCE = 5.0; // Jump force
 const GROUND_DETECTION_DISTANCE = 0.1; // Distance to check for ground beneath player
 
-// Original collider dimensions for the player
-const DEFAULT_CAPSULE_RADIUS = 0.5;
-const DEFAULT_CAPSULE_HEIGHT = 0.5; // Half-height of the cylinder part
-
 /**
  * Initializes the Rapier physics engine
  * @returns {Promise<boolean>} Promise that resolves when Rapier is initialized
@@ -87,7 +83,7 @@ export const createGroundCollider = (groundMesh) => {
 };
 
 /**
- * Creates a dynamic capsule collider for the player
+ * Creates a dynamic point-based physics object for the player
  * @param {THREE.Group} playerGroup - The group containing the player mesh
  * @param {object} gui - The GUI instance for adding controls
  * @returns {RAPIER.RigidBody} The created rigid body
@@ -107,12 +103,9 @@ export const createPlayerCollider = (playerGroup, gui) => {
 
   const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
 
-  // Create a capsule collider
-  // Parameters: half-height of the cylinder part, radius
-  const halfHeight = DEFAULT_CAPSULE_HEIGHT;
-  const radius = DEFAULT_CAPSULE_RADIUS;
-
-  const playerColliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
+  // Create a ball collider as a simple replacement for the capsule
+  const radius = 0.5;
+  const playerColliderDesc = RAPIER.ColliderDesc.ball(radius);
   const collider = world.createCollider(playerColliderDesc, playerRigidBody);
 
   // Store reference to group for syncing
@@ -121,138 +114,11 @@ export const createPlayerCollider = (playerGroup, gui) => {
     body: playerRigidBody,
     collider: collider,
     type: "player",
-    colliderDimensions: {
-      radius: radius,
-      halfHeight: halfHeight,
-    },
   };
 
   physicsObjects.push(physicsObject);
 
-  // Create debug controls for the collider if GUI is provided
-  if (gui) {
-    const colliderFolder = gui.addFolder("Player Collider");
-    const colliderParams = {
-      showCollider: false,
-      radius: radius,
-      height: halfHeight * 2,
-    };
-
-    // Add controls for collider visibility
-    colliderFolder
-      .add(colliderParams, "showCollider")
-      .name("Show Collider")
-      .onChange((value) => {
-        if (value) {
-          createColliderHelper(playerGroup, physicsObject);
-        } else {
-          removeColliderHelper(playerGroup);
-        }
-      });
-
-    // Add controls for collider dimensions
-    colliderFolder
-      .add(colliderParams, "radius")
-      .min(0.1)
-      .max(2)
-      .step(0.1)
-      .name("Radius")
-      .onChange((value) => {
-        updatePlayerCollider(physicsObject, value, colliderParams.height / 2);
-        // Update visual representation if visible
-        if (colliderParams.showCollider) {
-          removeColliderHelper(playerGroup);
-          createColliderHelper(playerGroup, physicsObject);
-        }
-      });
-
-    colliderFolder
-      .add(colliderParams, "height")
-      .min(0.2)
-      .max(4)
-      .step(0.1)
-      .name("Height")
-      .onChange((value) => {
-        updatePlayerCollider(physicsObject, colliderParams.radius, value / 2);
-        // Update visual representation if visible
-        if (colliderParams.showCollider) {
-          removeColliderHelper(playerGroup);
-          createColliderHelper(playerGroup, physicsObject);
-        }
-      });
-  }
-
   return playerRigidBody;
-};
-
-/**
- * Creates a visual helper for the player's collider
- * @param {THREE.Group} playerGroup - The player group
- * @param {Object} physicsObject - The physics object containing the collider
- */
-const createColliderHelper = (playerGroup, physicsObject) => {
-  if (!scene) return;
-
-  removeColliderHelper(playerGroup); // Remove existing helper first
-
-  // Create a wireframe capsule to visualize the collider
-  const radius = physicsObject.colliderDimensions.radius;
-  const halfHeight = physicsObject.colliderDimensions.halfHeight;
-
-  const geometry = new THREE.CapsuleGeometry(radius, halfHeight * 2, 16, 8);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    wireframe: true,
-    opacity: 0.5,
-    transparent: true,
-  });
-
-  const colliderHelper = new THREE.Mesh(geometry, material);
-  playerGroup.add(colliderHelper);
-
-  // Store reference to the helper
-  playerGroup.userData.colliderHelper = colliderHelper;
-};
-
-/**
- * Removes the visual helper for the player's collider
- * @param {THREE.Group} playerGroup - The player group
- */
-const removeColliderHelper = (playerGroup) => {
-  if (playerGroup.userData.colliderHelper) {
-    playerGroup.remove(playerGroup.userData.colliderHelper);
-    playerGroup.userData.colliderHelper = null;
-  }
-};
-
-/**
- * Updates the player collider dimensions
- * @param {Object} physicsObject - The physics object containing the collider
- * @param {number} radius - The new radius for the capsule collider
- * @param {number} halfHeight - The new half-height for the capsule collider
- */
-const updatePlayerCollider = (physicsObject, radius, halfHeight) => {
-  if (!physicsObject || !world) return;
-
-  // Store the current body position before removing the old collider
-  const currentPos = physicsObject.body.translation();
-  const currentVel = physicsObject.body.linvel();
-
-  // Remove the current collider
-  world.removeCollider(physicsObject.collider, true);
-
-  // Create a new collider with the updated dimensions
-  const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
-  physicsObject.collider = world.createCollider(
-    colliderDesc,
-    physicsObject.body
-  );
-
-  // Update stored dimensions
-  physicsObject.colliderDimensions = {
-    radius: radius,
-    halfHeight: halfHeight,
-  };
 };
 
 /**
@@ -274,40 +140,17 @@ export const updatePhysics = (
   const playerPhysics = getPlayerPhysics();
   if (playerPhysics) {
     // Rotate input direction based on camera rotation
-    const rotatedDirection = rotateDirectionWithCamera(inputDirection, cameraRotation);
-    
+    const rotatedDirection = rotateDirectionWithCamera(
+      inputDirection,
+      cameraRotation
+    );
+
     // Handle player movement with rotated direction
     movePlayer(playerPhysics.body, rotatedDirection, deltaTime);
 
     // Handle jumping
     if (jumpRequested && isPlayerOnGround(playerPhysics.body)) {
       playerJump(playerPhysics.body);
-    }
-
-    // Check for scale changes and update collider if needed
-    const playerGroup = playerPhysics.mesh;
-    if (playerGroup.userData && playerGroup.userData.scale) {
-      const scale = playerGroup.userData.scale;
-
-      // Check if scale has changed enough to warrant updating the collider
-      const currentRadius = playerPhysics.colliderDimensions.radius;
-      const currentHalfHeight = playerPhysics.colliderDimensions.halfHeight;
-
-      const targetRadius = DEFAULT_CAPSULE_RADIUS * ((scale.x + scale.z) / 2);
-      const targetHalfHeight = DEFAULT_CAPSULE_HEIGHT * scale.y;
-
-      if (
-        Math.abs(targetRadius - currentRadius) > 0.01 ||
-        Math.abs(targetHalfHeight - currentHalfHeight) > 0.01
-      ) {
-        updatePlayerCollider(playerPhysics, targetRadius, targetHalfHeight);
-
-        // Update collider helper if it exists
-        if (playerGroup.userData.colliderHelper) {
-          removeColliderHelper(playerGroup);
-          createColliderHelper(playerGroup, playerPhysics);
-        }
-      }
     }
 
     // Always update player rotation to face the camera direction
@@ -321,12 +164,13 @@ export const updatePhysics = (
   for (const obj of physicsObjects) {
     if (obj.type === "player") {
       // Update player group position based on physics body
+      // The translation affects the collider, and we move the player to match
       const position = obj.body.translation();
+
+      // Apply position from collider to player mesh to maintain alignment
       obj.mesh.position.x = position.x;
       obj.mesh.position.y = position.y;
       obj.mesh.position.z = position.z;
-      
-      // Rotation is now handled by updatePlayerRotation
     }
     // Ground is static, so no need to update its position
   }
@@ -334,18 +178,18 @@ export const updatePhysics = (
 
 /**
  * Rotates the input direction to align with camera rotation
- * @param {Object} direction - Raw input direction 
+ * @param {Object} direction - Raw input direction
  * @param {Object} cameraRotation - Camera rotation
  * @returns {Object} - Rotated direction vector
  */
 const rotateDirectionWithCamera = (direction, cameraRotation) => {
   if (direction.x === 0 && direction.z === 0) return direction;
-  
+
   const angle = cameraRotation.y;
-  
+
   return {
     x: direction.x * Math.cos(angle) - direction.z * Math.sin(angle),
-    z: direction.x * Math.sin(angle) + direction.z * Math.cos(angle)
+    z: direction.x * Math.sin(angle) + direction.z * Math.cos(angle),
   };
 };
 
@@ -356,9 +200,13 @@ const rotateDirectionWithCamera = (direction, cameraRotation) => {
  */
 const updatePlayerRotation = (playerMesh, cameraRotation) => {
   if (!playerMesh) return;
-  
+
   // Set player rotation to match camera's horizontal rotation
   playerMesh.rotation.y = cameraRotation.y;
+
+  // Only rotate the player mesh, not the collider
+  // This ensures rotations are always applied to the player model
+  // while the collider remains aligned with global axes
 };
 
 /**
@@ -431,6 +279,8 @@ const isPlayerOnGround = (playerBody) => {
 export const setPlayerPosition = (playerBody, x, y, z) => {
   if (!playerBody) return;
   playerBody.setTranslation({ x, y, z }, true);
+
+  // The player mesh will be synced to match this position in updatePhysics()
 };
 
 /**

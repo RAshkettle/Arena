@@ -39,30 +39,34 @@ export const updateCameraAspect = (camera, windowSize) => {
  * @param {number} [cameraRotation.x] - X-axis rotation (pitch)
  * @param {number} [cameraRotation.y] - Y-axis rotation (yaw)
  */
-export const updateThirdPersonCamera = (camera, player, cameraRotation = { x: 0, y: 0 }) => {
+export const updateThirdPersonCamera = (
+  camera,
+  player,
+  cameraRotation = { x: 0, y: 0 }
+) => {
   // Camera settings
   const cameraDistance = 4;
   const cameraHeight = 2;
-  
+
   // Get player rotation around Y axis
   const playerAngle = player.rotation.y;
-  
+
   // Apply pitch (vertical angle) from mouse input
-  const cameraPhi = cameraRotation.x; 
-  
+  const cameraPhi = cameraRotation.x;
+
   // Calculate camera position to be directly behind the player
   // Use player's rotation angle for horizontal positioning
   const x = -Math.sin(playerAngle) * Math.cos(cameraPhi) * cameraDistance;
   const y = Math.sin(cameraPhi) * cameraDistance + cameraHeight;
   const z = -Math.cos(playerAngle) * Math.cos(cameraPhi) * cameraDistance;
-  
+
   // Position camera relative to player
   camera.position.set(
     player.position.x + x,
     player.position.y + y,
     player.position.z + z
   );
-  
+
   // Look at the player (slightly above its base)
   camera.lookAt(player.position.x, player.position.y + 0.5, player.position.z);
 };

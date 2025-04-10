@@ -1,7 +1,16 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { createPlayerCollider, getPlayerPhysics } from "./physics";
+
+let playerGroup = null;
+let playerModel = null;
+let playerMixer = null;
+let animationActions = {};
+let currentAction = null;
+let previousAction = null;
 
 /**
- * Creates a player represented by a white capsule
+ * Creates a player using a loaded skeleton model
  * @param {THREE.Scene} scene - The scene to add the player to
  * @param {object} gui - The GUI instance for adding controls
  * @returns {THREE.Group} The created player group
@@ -10,39 +19,74 @@ export const createPlayer = (scene, gui) => {
   // Create a group to hold the player and its marker
   const playerGroup = new THREE.Group();
 
-  // Create a capsule with 2 units height
-  const geometry = new THREE.CapsuleGeometry(0.5, 1, 16, 16);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xffffff, // White color
-  });
-  const player = new THREE.Mesh(geometry, material);
-
-  // Add the capsule mesh to the group
-  playerGroup.add(player);
-
-  // Create a small red sphere as a marker for the front of the player
-  const sphereGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-  const sphereMaterial = new THREE.MeshStandardMaterial({
-    color: 0xff0000, // Red color
-    emissive: 0xff0000,
-    emissiveIntensity: 0.3, // Add some glow effect
-  });
-  const marker = new THREE.Mesh(sphereGeometry, sphereMaterial);
-
-  // Position the marker at the front of the capsule, 2/3 of the way up
-  // Capsule is 2 units tall (radius 0.5 + height 1 + radius 0.5)
-  // 2/3 of the way up is at y = 2 * (2/3) - 1 = 0.33
-  marker.position.set(0, 0.33, -0.5);
-
-  // Add the marker to the group
-  playerGroup.add(marker);
-
   // Position the player higher to demonstrate gravity
   // The physics system will make it fall onto the ground
   playerGroup.position.y = 5;
 
   // Add the player group to the scene
   scene.add(playerGroup);
+
+  // Set up a temporary capsule until the model loads
+  const tempGeometry = new THREE.CapsuleGeometry(0.5, 1, 16, 16);
+  const tempMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const tempMesh = new THREE.Mesh(tempGeometry, tempMaterial);
+  playerGroup.add(tempMesh);
+
+  // Store a reference to the player mesh on the group
+  playerGroup.playerMesh = tempMesh;
+
+  // Load the Skeleton model
+  const loader = new GLTFLoader();
+  loader.load(
+    "assets/Skeleton.glb",
+    (gltf) => {
+      // Remove the temporary capsule
+      playerGroup.remove(tempMesh);
+
+      const model = gltf.scene;
+
+      // Get the bounding box of the model to calculate proper scaling
+      const boundingBox = new THREE.Box3().setFromObject(model);
+      const originalHeight = boundingBox.max.y - boundingBox.min.y;
+
+      // Calculate scale factor to make the model 2 units high
+      const targetHeight = 2.0;
+      const scaleFactor = targetHeight / originalHeight;
+
+      // Apply uniform scaling to maintain proportions
+      model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+      // Update the bounding box after scaling
+      const scaledBoundingBox = new THREE.Box3().setFromObject(model);
+
+      // Calculate the offset needed to align the model with the physics collider
+      // The collider is a capsule with its origin at its center
+      const modelHeight = scaledBoundingBox.max.y - scaledBoundingBox.min.y;
+      const modelCenter = new THREE.Vector3();
+      scaledBoundingBox.getCenter(modelCenter);
+
+      // Position model so its feet are at y=0 and center of gravity aligns with collider
+      model.position.set(0, -scaledBoundingBox.min.y, 0);
+
+      // Add the model to the group
+      playerGroup.add(model);
+
+      // Update the player mesh reference
+      playerGroup.playerMesh = model;
+
+      console.log("Skeleton model loaded successfully");
+    },
+    (xhr) => {
+      console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+    },
+    (error) => {
+      console.error("Error loading model:", error);
+    }
+  );
 
   // Create debug UI folders
   const playerFolder = gui.addFolder("Player Position");
@@ -120,7 +164,7 @@ export const createPlayer = (scene, gui) => {
     .step(0.1)
     .name("Uniform")
     .onChange((value) => {
-      player.scale.set(value, value, value);
+      playerGroup.playerMesh.scale.set(value, value, value);
       scaleControl.x = value;
       scaleControl.y = value;
       scaleControl.z = value;
@@ -133,6 +177,7 @@ export const createPlayer = (scene, gui) => {
       });
 
       // Store the current scale for physics updates
+      // This will be used in updatePhysics to scale the collider
       playerGroup.userData.scale = { x: value, y: value, z: value };
     });
 
@@ -143,7 +188,8 @@ export const createPlayer = (scene, gui) => {
     .step(0.1)
     .name("X")
     .onChange((value) => {
-      player.scale.x = value;
+      playerGroup.playerMesh.scale.x = value;
+      // Store the updated scale for physics collider synchronization
       playerGroup.userData.scale.x = value;
     });
 
@@ -154,7 +200,8 @@ export const createPlayer = (scene, gui) => {
     .step(0.1)
     .name("Y")
     .onChange((value) => {
-      player.scale.y = value;
+      playerGroup.playerMesh.scale.y = value;
+      // Store the updated scale for physics collider synchronization
       playerGroup.userData.scale.y = value;
     });
 
@@ -165,13 +212,10 @@ export const createPlayer = (scene, gui) => {
     .step(0.1)
     .name("Z")
     .onChange((value) => {
-      player.scale.z = value;
+      playerGroup.playerMesh.scale.z = value;
+      // Store the updated scale for physics collider synchronization
       playerGroup.userData.scale.z = value;
     });
-
-  // Store a reference to the player mesh on the group
-  playerGroup.playerMesh = player;
-  playerGroup.marker = marker;
 
   // Initialize userData for physics-related properties
   playerGroup.userData = {
@@ -181,4 +225,146 @@ export const createPlayer = (scene, gui) => {
   };
 
   return playerGroup;
+};
+
+/**
+ * Loads the player model and creates the player in the scene
+ * @param {THREE.Scene} scene - The scene to add the player to
+ * @returns {Promise<THREE.Group>} - Promise that resolves to the player group
+ */
+export const loadPlayer = async (scene) => {
+  return new Promise((resolve, reject) => {
+    const loader = new GLTFLoader();
+    loader.load(
+      "assets/Skeleton.glb",
+      (gltf) => {
+        const model = gltf.scene;
+        playerModel = model;
+
+        // Create animations
+        const animations = gltf.animations;
+        if (animations && animations.length) {
+          // Set up animation mixer and actions
+          playerMixer = new THREE.AnimationMixer(model);
+
+          // Create animation actions
+          animations.forEach((clip) => {
+            const action = playerMixer.clipAction(clip);
+            animationActions[clip.name] = action;
+
+            // Set default animation parameters
+            action.clampWhenFinished = true;
+            action.loop = THREE.LoopRepeat;
+          });
+
+          // Set default animation
+          currentAction = animationActions["Idle"];
+          if (currentAction) {
+            currentAction.play();
+          }
+        }
+
+        // Calculate bounding box for proper positioning
+        const boundingBox = new THREE.Box3().setFromObject(model);
+        const scaledBoundingBox = boundingBox.clone();
+
+        // Position model so feet are at y=0
+        model.position.set(0, -scaledBoundingBox.min.y, 0);
+
+        // Create a group to hold the player model
+        playerGroup = new THREE.Group();
+        playerGroup.add(model);
+
+        // Store the original model dimensions for scale updates
+        playerGroup.userData = {
+          originalHeight: boundingBox.max.y - boundingBox.min.y,
+          originalWidth: Math.max(
+            boundingBox.max.x - boundingBox.min.x,
+            boundingBox.max.z - boundingBox.min.z
+          ),
+          scale: { x: 1.0, y: 1.0, z: 1.0 },
+          boundingBox: boundingBox.clone(),
+        };
+
+        // Add the player group to the scene
+        scene.add(playerGroup);
+
+        // Create physics collider for the player
+        createPlayerCollider(playerGroup);
+
+        resolve(playerGroup);
+      },
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+      },
+      (error) => {
+        console.error("An error happened while loading the player", error);
+        reject(error);
+      }
+    );
+  });
+};
+
+/**
+ * Sets the scale of the player
+ * @param {object} scale - Scale values {x, y, z}
+ */
+export const setPlayerScale = (scale) => {
+  if (!playerGroup || !playerModel) return;
+
+  // Apply scale to the model
+  playerModel.scale.set(scale.x, scale.y, scale.z);
+
+  // Store the scale for physics updates
+  playerGroup.userData.scale = {
+    x: scale.x,
+    y: scale.y,
+    z: scale.z,
+  };
+
+  // The scale is now synchronized between player model and collider
+  // Physics system will detect this change via the userData.scale property
+  // and update the collider dimensions accordingly in the next update cycle
+
+  // Update the player group position in the y direction based on the new scale
+  // This ensures the model's feet stay at y=0
+  const boundingBox = playerGroup.userData.boundingBox.clone();
+  boundingBox.min.y *= scale.y;
+  playerModel.position.y = -boundingBox.min.y;
+};
+
+/**
+ * Updates the animations of the player
+ * @param {number} deltaTime - Time step for animation update
+ * @param {object} movementInput - Input for movement (x, z)
+ */
+export const updatePlayerAnimations = (deltaTime, movementInput) => {
+  if (!playerMixer || !playerModel) return;
+
+  // Update the animation mixer
+  playerMixer.update(deltaTime);
+
+  // Determine animation based on player movement
+  const isMoving =
+    Math.abs(movementInput.x) > 0.1 || Math.abs(movementInput.z) > 0.1;
+
+  // Change animation based on movement state
+  const targetAction = isMoving
+    ? animationActions["Walk"]
+    : animationActions["Idle"];
+
+  // Change animation if needed
+  if (targetAction && currentAction !== targetAction) {
+    previousAction = currentAction;
+    currentAction = targetAction;
+
+    if (previousAction) {
+      // Crossfade to new animation
+      previousAction.fadeOut(0.2);
+    }
+
+    currentAction.reset();
+    currentAction.fadeIn(0.2);
+    currentAction.play();
+  }
 };
